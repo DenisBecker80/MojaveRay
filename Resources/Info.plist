@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>ru</string>
+    <key>CFBundleDisplayName</key>
+    <string>MojaveRay</string>
+    <key>CFBundleExecutable</key>
+    <string>MojaveRay</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.denisbekker.MojaveRay</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>MojaveRay</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.9</string>
+    <key>CFBundleIconFile</key>
+    <string>MojaveRay.icns</string>
+    <key>CFBundleVersion</key>
+    <string>15</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.14.6</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2026. Personal utility.</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+</dict>
+</plist>

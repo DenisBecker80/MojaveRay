@@ -1,0 +1,5 @@
+.build/
+Build/
+Vendor/bin/xray
+Vendor/bin/tun2socks
+.DS_Store
