@@ -2,8 +2,39 @@ import Foundation
 import Darwin
 import MojaveRayCore
 
+/// Splits a byte stream into complete lines. Pipe chunks may cut a line, or a
+/// multi-byte UTF-8 character, in half; decoding only whole lines keeps both.
+final class LineBuffer {
+    private var pending = Data()
+    private let limit = 64 * 1024
+
+    func append(_ data: Data) -> [String] {
+        pending.append(data)
+        var lines: [String] = []
+        while let index = pending.firstIndex(of: 0x0A) {
+            let line = pending[pending.startIndex..<index]
+            lines.append(String(decoding: line, as: UTF8.self))
+            pending.removeSubrange(pending.startIndex...index)
+        }
+        if pending.count > limit {
+            lines.append(String(decoding: pending, as: UTF8.self))
+            pending.removeAll()
+        }
+        return lines
+    }
+
+    func flush() -> [String] {
+        guard !pending.isEmpty else { return [] }
+        defer { pending.removeAll() }
+        return [String(decoding: pending, as: UTF8.self)]
+    }
+}
+
 final class ManagedProcesses {
     var onLog: ((String) -> Void)?
+    /// Called on a background thread when the running core exits without
+    /// stopAll(). Not called for processes that never became the core.
+    var onUnexpectedExit: ((String) -> Void)?
 
     private var coreProcess: Process?
     private var redactionTokens: [String] = []
@@ -34,7 +65,7 @@ final class ManagedProcesses {
         lock.unlock()
         guard !alreadyRunning else { return }
 
-        redactionTokens = profile.redactionTokens
+        setRedactionTokens(profile.redactionTokens)
         let process = Process()
         process.launchPath = xrayURL.path
         process.arguments = ["run", "-config", ApplicationPaths.configFile.path]
@@ -45,17 +76,21 @@ final class ManagedProcesses {
 
         attachLogPipes(to: process, prefix: "Xray")
         process.terminationHandler = { [weak self] terminated in
-            self?.emit("Xray завершён, код \(terminated.terminationStatus)")
+            self?.coreTerminated(terminated, name: "Xray")
         }
 
-        do {
-            try process.run()
-        } catch {
-            throw AppError.coreFailed(error.localizedDescription)
-        }
+        // Register before launch so an immediate crash is still reported.
         lock.lock()
         coreProcess = process
         lock.unlock()
+        do {
+            try process.run()
+        } catch {
+            lock.lock()
+            if coreProcess === process { coreProcess = nil }
+            lock.unlock()
+            throw AppError.coreFailed(error.localizedDescription)
+        }
         writePID(process.processIdentifier, name: "xray.pid")
         emit("Xray запущен")
     }
@@ -68,31 +103,29 @@ final class ManagedProcesses {
         let process = Process()
         process.executableURL = url
         process.standardInput = input
-        redactionTokens = []
+        setRedactionTokens([])
         let ready = DispatchSemaphore(value: 0)
         let output = Pipe()
         let errors = Pipe()
         process.standardOutput = output
         process.standardError = errors
-        var marker = Data()
+        // Each handler runs serially on its own handle, so the buffers need no lock.
+        let outputLines = LineBuffer()
+        var signalled = false
         output.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
             if data.isEmpty {
                 handle.readabilityHandler = nil
                 return
             }
-            marker.append(data)
-            if String(data: marker, encoding: .utf8) == "AWG_SOCKS_READY\n" {
+            for line in outputLines.append(data) where !signalled && line == "AWG_SOCKS_READY" {
+                signalled = true
                 ready.signal()
             }
         }
-        errors.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            if data.isEmpty {
-                handle.readabilityHandler = nil
-            } else if let text = String(data: data, encoding: .utf8) {
-                self?.emit("AmneziaWG: \(text)")
-            }
+        attachLineHandler(to: errors, prefix: "AmneziaWG")
+        process.terminationHandler = { [weak self] terminated in
+            self?.coreTerminated(terminated, name: "AmneziaWG")
         }
         try process.run()
         guard ready.wait(timeout: .now() + 8) == .success, process.isRunning else {
@@ -128,17 +161,44 @@ final class ManagedProcesses {
         let errorPipe = Pipe()
         process.standardOutput = outputPipe
         process.standardError = errorPipe
+        attachLineHandler(to: outputPipe, prefix: prefix)
+        attachLineHandler(to: errorPipe, prefix: prefix)
+    }
 
-        outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+    private func attachLineHandler(to pipe: Pipe, prefix: String) {
+        let lines = LineBuffer()
+        pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
-            guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-            self?.emit("\(prefix): \(text)")
+            let complete: [String]
+            if data.isEmpty {
+                handle.readabilityHandler = nil
+                complete = lines.flush()
+            } else {
+                complete = lines.append(data)
+            }
+            for line in complete {
+                self?.emit("\(prefix): \(line)")
+            }
         }
-        errorPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-            self?.emit("\(prefix): \(text)")
-        }
+    }
+
+    private func coreTerminated(_ process: Process, name: String) {
+        lock.lock()
+        let wasCore = coreProcess === process
+        if wasCore { coreProcess = nil }
+        lock.unlock()
+        // stopAll() clears coreProcess before terminating, so a deliberate stop
+        // never reaches this branch.
+        guard wasCore else { return }
+        let reason = "\(name) неожиданно завершился, код \(process.terminationStatus)"
+        emit(reason)
+        onUnexpectedExit?(reason)
+    }
+
+    private func setRedactionTokens(_ tokens: [String]) {
+        lock.lock()
+        redactionTokens = tokens
+        lock.unlock()
     }
 
     private func stop(_ process: Process?) {
@@ -155,7 +215,10 @@ final class ManagedProcesses {
 
     private func emit(_ rawMessage: String) {
         var message = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        for token in redactionTokens where !token.isEmpty {
+        lock.lock()
+        let tokens = redactionTokens
+        lock.unlock()
+        for token in tokens where !token.isEmpty {
             message = message.replacingOccurrences(of: token, with: "[скрыто]")
         }
         guard !message.isEmpty else { return }

@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 )
@@ -15,6 +17,7 @@ func main() {
 	validate := flag.Bool("validate", false, "validate profile on stdin")
 	port := flag.Int("port", 10808, "local SOCKS5 port")
 	flag.Parse()
+	debug.SetMemoryLimit(memoryLimit)
 	p, e := readProfile(os.Stdin)
 	if e != nil {
 		fatal(e.Error())
@@ -54,15 +57,44 @@ func main() {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	go func() { <-sig; _ = l.Close() }()
 	fmt.Println("AWG_SOCKS_READY")
-	limit := make(chan struct{}, 128)
+	_ = serve(l, dial, maxClients)
+}
+
+// In full VPN mode every TCP connection and every UDP flow of the whole Mac
+// passes through this listener. Each session may hold up to ~1 MB of buffers
+// (see memory_test.go), so the limit bounds memory as well; idle sessions are
+// reclaimed by the timeouts in socks.go, which keeps 512 well above what a
+// browser needs at once.
+const maxClients = 512
+
+// Soft limit: makes the GC return memory to macOS early instead of letting
+// the heap grow to twice the live data.
+const memoryLimit = 384 << 20
+
+// serve returns only when the listener is closed. Transient Accept errors
+// (EMFILE, ECONNABORTED) must not stop the bridge: the app would keep its
+// routes pointing at a dead proxy.
+func serve(l net.Listener, dial dialFunc, limit int) error {
+	slots := make(chan struct{}, limit)
+	var backoff time.Duration
 	for {
 		c, err := l.Accept()
 		if err != nil {
-			return
+			if errors.Is(err, net.ErrClosed) {
+				return err
+			}
+			if backoff == 0 {
+				backoff = 5 * time.Millisecond
+			} else if backoff < time.Second {
+				backoff *= 2
+			}
+			time.Sleep(backoff)
+			continue
 		}
+		backoff = 0
 		select {
-		case limit <- struct{}{}:
-			go func() { defer func() { <-limit }(); serveSOCKS(c, dial) }()
+		case slots <- struct{}{}:
+			go func() { defer func() { <-slots }(); serveSOCKS(c, dial) }()
 		default:
 			c.Close()
 		}

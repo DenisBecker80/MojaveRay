@@ -1,11 +1,11 @@
-// swift-tools-version:5.1
+// swift-tools-version:5.3
 
 import PackageDescription
 
 let package = Package(
     name: "MojaveRay",
     platforms: [
-        .macOS(.v10_14)
+        .macOS(.v11)
     ],
     products: [
         .executable(name: "MojaveRay", targets: ["MojaveRay"])
@@ -25,6 +25,7 @@ let package = Package(
             path: "Sources/MojaveRay",
             linkerSettings: [
                 .linkedFramework("AppKit"),
+                .linkedFramework("SystemConfiguration"),
                 .linkedFramework("Security")
             ]
         ),

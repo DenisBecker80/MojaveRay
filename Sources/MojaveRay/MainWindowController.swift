@@ -239,6 +239,9 @@ final class MainWindowController: NSWindowController {
         connectionManager.onLog = { [weak self] message in
             self?.appendLog(message)
         }
+        connectionManager.onConnectionLost = { [weak self] error in
+            self?.showError(error)
+        }
     }
 
     @objc private func modeChanged() {
@@ -493,7 +496,16 @@ final class MainWindowController: NSWindowController {
             .foregroundColor: NSColor.textColor,
             .font: NSFont(name: "Menlo", size: 11) ?? NSFont.systemFont(ofSize: 11)
         ]
-        logTextView.textStorage?.append(NSAttributedString(string: line, attributes: attributes))
+        guard let storage = logTextView.textStorage else { return }
+        storage.append(NSAttributedString(string: line, attributes: attributes))
+        // Keep the journal bounded: an unstable network can log for days.
+        let maxCharacters = 200_000
+        if storage.length > maxCharacters {
+            let text = storage.string as NSString
+            let cut = text.range(of: "\n", options: [], range: NSRange(location: storage.length - maxCharacters, length: maxCharacters / 2))
+            let end = cut.location == NSNotFound ? storage.length - maxCharacters : cut.location + 1
+            storage.deleteCharacters(in: NSRange(location: 0, length: end))
+        }
         logTextView.scrollToEndOfDocument(self)
     }
 

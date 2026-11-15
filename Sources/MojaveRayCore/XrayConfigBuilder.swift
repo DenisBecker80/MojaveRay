@@ -23,9 +23,14 @@ public enum XrayConfigBuilder {
         ]
         if profile.transport == "grpc" {
             // Do not put grpcSettings into a TCP/RAW stream.
+            // Health checks detect a gRPC stream silently stalled by DPI or
+            // by sleep: without them Xray waits for the long TCP timeout.
             var grpcSettings: [String: Any] = [
                 "serviceName": profile.serviceName,
-                "multiMode": false
+                "multiMode": false,
+                "idle_timeout": 60,
+                "health_check_timeout": 20,
+                "permit_without_stream": false
             ]
             if !profile.authority.isEmpty { grpcSettings["authority"] = profile.authority }
             stream["grpcSettings"] = grpcSettings

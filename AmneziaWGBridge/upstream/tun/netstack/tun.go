@@ -71,6 +71,21 @@ func CreateNetTUN(localAddresses, dnsServers []netip.Addr, mtu int) (tun.Device,
 	if tcpipErr != nil {
 		return nil, nil, fmt.Errorf("could not enable TCP SACK: %v", tcpipErr)
 	}
+	// MojaveRay: gVisor gives every TCP connection 1 MB receive and send
+	// buffers by default. In full VPN mode the bridge carries hundreds of
+	// connections, and stalled ones (paused videos, background tabs) keep
+	// those buffers full: several GB in total. Receive auto-tuning does not
+	// help, because the bridge drains into a local socket and looks like a
+	// fast reader. A fixed 256 KB window still allows ~40 Mbit/s per stream at
+	// 50 ms RTT; browsers use many streams in parallel.
+	recvRange := tcpip.TCPReceiveBufferSizeRangeOption{Min: 4 << 10, Default: 256 << 10, Max: 256 << 10}
+	sendRange := tcpip.TCPSendBufferSizeRangeOption{Min: 4 << 10, Default: 256 << 10, Max: 256 << 10}
+	moderate := tcpip.TCPModerateReceiveBufferOption(false)
+	for _, opt := range []tcpip.SettableTransportProtocolOption{&recvRange, &sendRange, &moderate} {
+		if tcpipErr = dev.stack.SetTransportProtocolOption(tcp.ProtocolNumber, opt); tcpipErr != nil {
+			return nil, nil, fmt.Errorf("could not set TCP buffer option: %v", tcpipErr)
+		}
+	}
 	dev.notifyHandle = dev.ep.AddNotify(dev)
 	tcpipErr = dev.stack.CreateNIC(1, dev.ep)
 	if tcpipErr != nil {

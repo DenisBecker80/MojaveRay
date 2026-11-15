@@ -36,6 +36,9 @@ final class VLESSParserTests: XCTestCase {
         XCTAssertEqual(stream["network"] as? String, "grpc")
         XCTAssertEqual(stream["security"] as? String, "reality")
         XCTAssertEqual(grpc["serviceName"] as? String, "")
+        XCTAssertEqual(grpc["idle_timeout"] as? Int, 60)
+        XCTAssertEqual(grpc["health_check_timeout"] as? Int, 20)
+        XCTAssertEqual(grpc["permit_without_stream"] as? Bool, false)
         XCTAssertEqual(reality["serverName"] as? String, "example.com")
         XCTAssertEqual(reality["fingerprint"] as? String, "random")
     }

@@ -10,8 +10,83 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
+
+// Without these limits a session whose peer vanished (sleep, Wi-Fi change,
+// tunnel stall) keeps its slot forever, and the bridge eventually refuses all
+// new connections. Atomic so tests can shorten them while sessions run.
+var tcpIdleNanos, udpIdleNanos atomic.Int64
+
+func init() {
+	tcpIdleNanos.Store(int64(3 * time.Minute))
+	udpIdleNanos.Store(int64(2 * time.Minute))
+}
+
+func tcpIdleTimeout() time.Duration { return time.Duration(tcpIdleNanos.Load()) }
+func udpIdleTimeout() time.Duration { return time.Duration(udpIdleNanos.Load()) }
+
+// activity records the last moment any byte moved in either direction.
+type activity struct{ last atomic.Int64 }
+
+func newActivity() *activity {
+	a := &activity{}
+	a.touch()
+	return a
+}
+
+func (a *activity) touch() { a.last.Store(time.Now().UnixNano()) }
+
+func (a *activity) idle() time.Duration {
+	return time.Duration(time.Now().UnixNano() - a.last.Load())
+}
+
+// watchIdle closes every closer once the session has been idle for timeout.
+// The returned function stops the watcher; it is safe to call more than once.
+func watchIdle(a *activity, timeout time.Duration, closers ...io.Closer) func() {
+	done := make(chan struct{})
+	var once sync.Once
+	tick := timeout / 4
+	if tick < 10*time.Millisecond {
+		tick = 10 * time.Millisecond
+	}
+	go func() {
+		t := time.NewTicker(tick)
+		defer t.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-t.C:
+				if a.idle() >= timeout {
+					for _, c := range closers {
+						_ = c.Close()
+					}
+					return
+				}
+			}
+		}
+	}()
+	return func() { once.Do(func() { close(done) }) }
+}
+
+// copyActive is io.Copy that marks the session active on every chunk.
+func copyActive(dst io.Writer, src io.Reader, a *activity) {
+	buf := make([]byte, 16*1024)
+	for {
+		n, err := src.Read(buf)
+		if n > 0 {
+			a.touch()
+			if _, werr := dst.Write(buf[:n]); werr != nil {
+				return
+			}
+		}
+		if err != nil {
+			return
+		}
+	}
+}
 
 func target(r io.Reader, atyp byte) (string, error) {
 	n := 0
@@ -93,9 +168,12 @@ func serveSOCKS(c net.Conn, dial dialFunc) {
 			return
 		}
 		c.SetDeadline(time.Time{})
+		act := newActivity()
+		stopIdle := watchIdle(act, tcpIdleTimeout(), c, out)
+		defer stopIdle()
 		done := make(chan struct{})
-		go func() { io.Copy(out, r); closeWrite(out); close(done) }()
-		io.Copy(c, out)
+		go func() { copyActive(out, r, act); closeWrite(out); close(done) }()
+		copyActive(c, out, act)
 		closeWrite(c)
 		// Bound half-closed sessions so a broken peer cannot retain a slot forever.
 		select {
@@ -124,6 +202,10 @@ func udpRelay(c net.Conn, r *bufio.Reader, dial dialFunc) {
 		return
 	}
 	c.SetDeadline(time.Time{})
+	act := newActivity()
+	// Closing the control connection ends the association for the client too.
+	stopIdle := watchIdle(act, udpIdleTimeout(), relay, c)
+	defer stopIdle()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() { io.Copy(io.Discard, r); cancel(); relay.Close() }()
@@ -157,6 +239,7 @@ func udpRelay(c net.Conn, r *bufio.Reader, dial dialFunc) {
 		if client == nil {
 			client = from
 		}
+		act.touch()
 		hdr := append([]byte(nil), packet[:n-p.Len()]...)
 		payload := packet[n-p.Len() : n]
 		mu.Lock()
@@ -186,6 +269,7 @@ func udpRelay(c net.Conn, r *bufio.Reader, dial dialFunc) {
 					if e != nil {
 						return
 					}
+					act.touch()
 					if _, e = relay.WriteToUDP(b[:len(header)+n], receiver); e != nil {
 						return
 					}

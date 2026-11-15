@@ -15,6 +15,8 @@
 		A10000000000000000000006 /* ManagedProcesses.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* ManagedProcesses.swift */; };
 		A10000000000000000000007 /* PrivilegedNetworkController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* PrivilegedNetworkController.swift */; };
 		A10000000000000000000008 /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* ProcessRunner.swift */; };
+		A100000000000000000000F1 /* NetworkChangeMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F1 /* NetworkChangeMonitor.swift */; };
+		A100000000000000000000F2 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F2 /* SystemConfiguration.framework */; };
 		A10000000000000000000009 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* main.swift */; };
 		A1000000000000000000000A /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* AppError.swift */; };
 		A1000000000000000000000B /* VLESSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* VLESSParser.swift */; };
@@ -49,6 +51,8 @@
 		A20000000000000000000006 /* ManagedProcesses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedProcesses.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* PrivilegedNetworkController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedNetworkController.swift; sourceTree = "<group>"; };
 		A20000000000000000000008 /* ProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRunner.swift; sourceTree = "<group>"; };
+		A200000000000000000000F1 /* NetworkChangeMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkChangeMonitor.swift; sourceTree = "<group>"; };
+		A200000000000000000000F2 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
 		A20000000000000000000009 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		A2000000000000000000000A /* AppError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppError.swift; sourceTree = "<group>"; };
 		A2000000000000000000000B /* VLESSParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VLESSParser.swift; sourceTree = "<group>"; };
@@ -74,6 +78,7 @@
 				A10000000000000000000012 /* libMojaveRayCore.a in Frameworks */,
 				A10000000000000000000010 /* AppKit.framework in Frameworks */,
 				A10000000000000000000013 /* Security.framework in Frameworks */,
+				A100000000000000000000F2 /* SystemConfiguration.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 				A20000000000000000000006 /* ManagedProcesses.swift */,
 				A20000000000000000000007 /* PrivilegedNetworkController.swift */,
 				A20000000000000000000008 /* ProcessRunner.swift */,
+				A200000000000000000000F1 /* NetworkChangeMonitor.swift */,
 				A20000000000000000000009 /* main.swift */,
 			);
 			path = Sources/MojaveRay;
@@ -144,6 +150,7 @@
 			children = (
 				A20000000000000000000010 /* AppKit.framework */,
 				A20000000000000000000011 /* Security.framework */,
+				A200000000000000000000F2 /* SystemConfiguration.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -290,6 +297,7 @@
 				A10000000000000000000006 /* ManagedProcesses.swift in Sources */,
 				A10000000000000000000007 /* PrivilegedNetworkController.swift in Sources */,
 				A10000000000000000000008 /* ProcessRunner.swift in Sources */,
+				A100000000000000000000F1 /* NetworkChangeMonitor.swift in Sources */,
 				A10000000000000000000009 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -322,7 +330,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.14.6;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.0;
@@ -335,7 +343,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.14.6;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				ONLY_ACTIVE_ARCH = NO;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -352,7 +360,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 10.14.6;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.denisbekker.MojaveRay;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -367,7 +375,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 10.14.6;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.denisbekker.MojaveRay;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -379,7 +387,7 @@
 			buildSettings = {
 				ARCHS = x86_64;
 				DEFINES_MODULE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.14.6;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				PRODUCT_MODULE_NAME = MojaveRayCore;
 				PRODUCT_NAME = MojaveRayCore;
 				SKIP_INSTALL = YES;
@@ -392,7 +400,7 @@
 			buildSettings = {
 				ARCHS = x86_64;
 				DEFINES_MODULE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.14.6;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				PRODUCT_MODULE_NAME = MojaveRayCore;
 				PRODUCT_NAME = MojaveRayCore;
 				SKIP_INSTALL = YES;

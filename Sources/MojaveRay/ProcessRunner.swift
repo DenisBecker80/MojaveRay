@@ -21,14 +21,23 @@ enum ProcessRunner {
         }
 
         try process.run()
+
+        // Drain both pipes while the child runs. Reading only after exit
+        // deadlocks once the child fills a pipe buffer (about 64 KB).
+        var errorData = Data()
+        let errorDone = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .utility).async {
+            errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            errorDone.signal()
+        }
+        let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+        errorDone.wait()
         process.waitUntilExit()
 
-        let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
         return CommandResult(
             status: process.terminationStatus,
-            standardOutput: String(data: outputData, encoding: .utf8) ?? "",
-            standardError: String(data: errorData, encoding: .utf8) ?? ""
+            standardOutput: String(decoding: outputData, as: UTF8.self),
+            standardError: String(decoding: errorData, as: UTF8.self)
         )
     }
 }

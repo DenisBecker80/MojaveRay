@@ -43,22 +43,22 @@ echo "Проверяю системный помощник…"
 /bin/bash -n "$PROJECT_DIR/Resources/mojaveray-helper.sh"
 /usr/bin/plutil -lint "$PROJECT_DIR/Resources/Info.plist"
 
-export MACOSX_DEPLOYMENT_TARGET=10.14
+export MACOSX_DEPLOYMENT_TARGET=11.0
 mkdir -p "$BUILD_DIR"
 STAGE_DIR="$(/usr/bin/mktemp -d "$BUILD_DIR/.mojaveray-build.XXXXXX")"
 STAGE_APP="$STAGE_DIR/MojaveRay.app"
 mkdir -p "$STAGE_APP/Contents/MacOS" "$STAGE_APP/Contents/Resources/bin"
 
 echo "Собираю ядро MojaveRay…"
-"$SWIFTC_BIN" -sdk "$SDK" -target x86_64-apple-macosx10.14 \
+"$SWIFTC_BIN" -sdk "$SDK" -target x86_64-apple-macosx11.0 \
     -O -whole-module-optimization -parse-as-library -module-name MojaveRayCore \
     -emit-module -emit-module-path "$STAGE_DIR/MojaveRayCore.swiftmodule" \
     -emit-object Sources/MojaveRayCore/*.swift -o "$STAGE_DIR/MojaveRayCore.o"
 
 echo "Собираю MojaveRay для Intel…"
-"$SWIFTC_BIN" -sdk "$SDK" -target x86_64-apple-macosx10.14 \
+"$SWIFTC_BIN" -sdk "$SDK" -target x86_64-apple-macosx11.0 \
     -O -I "$STAGE_DIR" Sources/MojaveRay/*.swift "$STAGE_DIR/MojaveRayCore.o" \
-    -framework AppKit -framework Security -o "$STAGE_APP/Contents/MacOS/MojaveRay"
+    -framework AppKit -framework Security -framework SystemConfiguration -o "$STAGE_APP/Contents/MacOS/MojaveRay"
 
 cp "$PROJECT_DIR/Resources/MojaveRayIcon.png" "$STAGE_APP/Contents/Resources/MojaveRayIcon.png"
 cp "$PROJECT_DIR/Resources/MojaveRay.icns" "$STAGE_APP/Contents/Resources/MojaveRay.icns"

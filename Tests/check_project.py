@@ -28,8 +28,8 @@ for shell in list((root / "Scripts").glob("*")) + list((root / "Resources").glob
         subprocess.run(["bash", "-n", str(shell)], check=True)
 with (root / "Resources/Info.plist").open("rb") as stream:
     info = plistlib.load(stream)
-assert info["CFBundleShortVersionString"] == "1.9"
-assert info["LSMinimumSystemVersion"] == "10.14.6"
+assert info["CFBundleShortVersionString"] == "1.10.1"
+assert info["LSMinimumSystemVersion"] == "11.0"
 app_delegate = (root / "Sources/MojaveRay/AppDelegate.swift").read_text()
 assert "NSRunningApplication.runningApplications" in app_delegate
 assert "DistributedNotificationCenter.default()" in app_delegate

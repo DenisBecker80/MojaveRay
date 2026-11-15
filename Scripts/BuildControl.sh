@@ -6,11 +6,11 @@ resources_dir="$1"
 test_dir="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/mojaveray-tests.XXXXXX")"
 trap '/bin/rm -f "$test_dir/control-tests"; /bin/rmdir "$test_dir"' EXIT
 /usr/bin/xcrun clang -std=c11 -Wall -Wextra -O2 -arch x86_64 \
-    -mmacosx-version-min=10.14 -lproc \
+    -mmacosx-version-min=11.0 -lproc \
     "$project_dir/Tests/control_tests.c" -o "$test_dir/control-tests"
 "$test_dir/control-tests"
 /usr/bin/xcrun clang -std=c11 -Wall -Wextra -O2 -arch x86_64 \
-    -mmacosx-version-min=10.14 -lproc \
+    -mmacosx-version-min=11.0 -lproc \
     "$project_dir/Helper/control.c" -o "$resources_dir/bin/control"
 /bin/cp "$project_dir/Resources/mojaveray-service-install.sh" "$resources_dir/mojaveray-service-install.sh"
 /bin/chmod 755 "$resources_dir/bin/control" "$resources_dir/mojaveray-service-install.sh"
